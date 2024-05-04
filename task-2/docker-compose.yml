@@ -1,0 +1,7 @@
+version: '3'
+services:
+  test2:
+    image: hello-world
+    command: echo 'hai'
+    volumes:
+      - testvolume
