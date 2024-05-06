@@ -17,5 +17,11 @@ RUN chmod +x chat.c
 # Compile chat.c
 RUN gcc -o chat chat.c
 
-# Run the application
-CMD ["./chat"]
+# Create a Volume shared
+VOLUME /dockermessage
+
+# Set entrypoint to run an interactive shell
+ENTRYPOINT ["/bin/sh"]
+
+# # Run the application
+# CMD ["./chat"]
