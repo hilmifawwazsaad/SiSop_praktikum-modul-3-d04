@@ -1,12 +1,8 @@
 # Base Image
-FROM alpine:latest
-
-# Install Dependencies
-RUN apk update && \
-    apk add --no-cache gcc libc-dev
+FROM gcc:latest
 
 # Set working directory
-WORKDIR /dockermessage
+WORKDIR /APP
 
 # Copy chat.c to working directory
 COPY chat.c .
@@ -15,13 +11,13 @@ COPY chat.c .
 RUN chmod +x chat.c
 
 # Compile chat.c
-RUN gcc -o chat chat.c
+RUN gcc -o chat chat.c -pthread
 
-# Create a Volume shared
-VOLUME /dockermessage
+# Run the application
+CMD ["./chat"]
 
-# Set entrypoint to run an interactive shell
-ENTRYPOINT ["/bin/sh"]
+# # Create a Volume shared
+# VOLUME /shared
 
-# # Run the application
-# CMD ["./chat"]
+# # Set entrypoint to run an interactive shell
+# ENTRYPOINT ["/bin/sh"]

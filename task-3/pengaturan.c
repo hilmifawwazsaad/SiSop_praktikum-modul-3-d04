@@ -97,7 +97,6 @@ void loginContainer(const char *containerName) {
     }
 }
 
-
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         printf("Usage: %s <create/delete/list/login/connect/unconnect> [container_name1] [container_name2]\n", argv[0]);
@@ -186,7 +185,6 @@ int main(int argc, char *argv[]) {
             printf("Usage: %s unconnect <container_name1> <container_name2>\n", argv[0]);
             return 1;
         }
-
 
         memset(twopersononchat, 0, sizeof(twopersononchat));
         unconnectContainers(argv[2], argv[3]);
