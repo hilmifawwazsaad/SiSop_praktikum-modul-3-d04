@@ -24,7 +24,7 @@ RUN mkdir -p /root/.kaggle && \
     chmod 600 /root/.kaggle/kaggle.json
 
 # Set working directory
-WORKDIR /joki-ml-bang
+WORKDIR /APP
 
 # Copy source code to working directory
 COPY ayamgoreng.c .
