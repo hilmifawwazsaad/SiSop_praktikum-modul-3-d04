@@ -34,6 +34,3 @@ RUN chmod +x ayamgoreng.c
 
 # Compile source code
 RUN gcc -o ayamgoreng ayamgoreng.c
-
-# Run the application
-CMD ["./ayamgoreng"]
