@@ -59,7 +59,7 @@ void unconnectContainers(const char *container1, const char *container2) {
 
     // Stop container 1
     char command[512];
-    snprintf(command, sizeof(command), "docker rm %s", container1);
+    snprintf(command, sizeof(command), "docker stop %s", container1);
     status = system(command);
     if (status == -1) {
         perror("Error stopping container 1");
@@ -68,7 +68,7 @@ void unconnectContainers(const char *container1, const char *container2) {
     }
 
     // Stop container 2
-    snprintf(command, sizeof(command), "docker rm %s", container2);
+    snprintf(command, sizeof(command), "docker stop %s", container2);
     status = system(command);
     if (status == -1) {
         perror("Error stopping container 2");
@@ -76,14 +76,6 @@ void unconnectContainers(const char *container1, const char *container2) {
         fprintf(stderr, "Failed to stop container 2: %s\n", container2);
     }
 
-    // Remove shared volume
-    snprintf(command, sizeof(command), "docker volume rm $(docker volume ls -qf 'name=sharedvolume')");
-    status = system(command);
-    if (status == -1) {
-        perror("Error removing shared volume");
-    } else if (status != 0) {
-        fprintf(stderr, "Failed to remove shared volume\n");
-    }
 }
 
 void loginContainer(const char *containerName) {

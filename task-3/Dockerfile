@@ -13,11 +13,8 @@ RUN chmod +x chat.c
 # Compile chat.c
 RUN gcc -o chat chat.c -pthread
 
-# Run the application
-CMD ["./chat"]
+# Create a Volume shared (POIN C DAN D)
+VOLUME /shared
 
-# # Create a Volume shared
-# VOLUME /shared
-
-# # Set entrypoint to run an interactive shell
-# ENTRYPOINT ["/bin/sh"]
+# Set entrypoint to run an interactive shell (POIN C DAN D)
+ENTRYPOINT ["/bin/sh"]
