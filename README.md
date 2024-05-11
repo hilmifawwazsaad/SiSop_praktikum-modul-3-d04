@@ -564,14 +564,156 @@ Buatlah program `chat.c` yang dapat menulis pesan dan membaca pesan pada sebuah 
 
 **Jawab**
 
-[Jawab Disini]
+*1. Membuat fungsi untuk menulis pesan ke dalam file*
+```C
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <string.h>
+#include <unistd.h>
+#define MAX 1000
+
+// POIN A DAN B
+char message[MAX][MAX]; // array untuk menyimpan kata-kata
+int message_length = 0; // panjang pesan
+
+void *write_msg(void *filename) {
+    FILE *file = fopen(filename, "w");
+    if (file == NULL) {
+        perror("Gagal membuka file untuk menulis");
+        pthread_exit(NULL);
+    }
+    // menulis setiap kata ke dalam file
+    for (int i = 0; i < message_length; i++) {
+        fprintf(file, "%s ", message[i]);
+    }
+
+    fclose(file);
+    printf("Pesan berhasil ditulis ke dalam file '%s'.\n", (char *)filename);
+    pthread_exit(NULL);
+}
+```
+- `#define MAX 1000` mendefinisikan konstanta MAX dengan nilai 1000, yang akan digunakan sebagai ukuran maksimum array
+- `char message[MAX][MAX]` mendeklarasikan array dua dimensi message yang memiliki ukuran maksimum `MAX` untuk setiap dimensinya. Array ini akan digunakan untuk menyimpan kata-kata yang akan ditulis ke dalam file
+- `int message_length = 0` mendeklarasikan variabel `message_length` yang akan digunakan untuk menyimpan panjang pesan
+- `void *write_msg(void *filename)` mendefinisikan fungsi `write_msg` yang akan dijalankan oleh thread. Fungsi ini akan menerima argumen berupa pointer ke string `filename` yang merupakan nama file yang akan ditulis
+- Loop `for` untuk menulis setiap kata dalam array `message` ke dalam file yang sudah dibuka. Setiap kata dipisahkan dengan spasi
+- `pthread_exit(NULL)` untuk mengakhiri eksekusi thread dan mengembalikan nilai `NULL`
+
+*2. Selanjutnya, membuat fungsi untuk membaca isi file*
+```C
+void *read_msg(void *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Gagal membuka file untuk dibaca");
+        pthread_exit(NULL);
+    }
+
+    char word[MAX];
+    printf("Pesan yang ditulis:\n");
+    while (fscanf(file, "%s", word) != EOF) {
+        printf("%s ", word); // membaca kata-kata dari file
+    }
+    printf("\n");
+
+    fclose(file);
+    pthread_exit(NULL);
+}
+```
+- `char word[MAX]` mendeklarasikan array `word` dengan ukuran maksimum `MAX`, yang akan digunakan untuk menyimpan kata yang dibaca dari file
+- Loop `while` akan membaca kata-kata dari file yang sudah dibuka menggunakan `fscanf`. Loop akan terus berjalan sampai mencapai akhir file `EOF`
+- `pthread_exit(NULL)` untuk mengakhiri eksekusi thread dan mengembalikan nilai `NULL`
+
+*3. Setelah semua fungsi dibuat, selanjutnya beralih ke Main Function*
+```C
+int main(int argc, char *argv[]) {
+    pthread_t read_thread, write_thread;
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <write/read> [<message>] [<target_container>]\n", argv[0]);
+        return 1;
+    }
+    FILE *fp;
+
+    if (strcmp(argv[1], "write") == 0) {
+        //  POIN A DAN B
+        for (int i = 2; i < argc - 1; i++) {
+            strcpy(message[message_length], argv[i]);
+            message_length++;
+        }
+        if (pthread_create(&write_thread, NULL, write_msg, (void *)argv[argc - 1])) {
+            perror("Gagal membuat thread");
+            return 1;
+        }
+        pthread_join(write_thread, NULL); // menunggu thread selesai
+    } else if (strcmp(argv[1], "read") == 0) { // POIN A DAN B
+        if (pthread_create(&read_thread, NULL, read_msg, (void *)argv[2])) {
+            perror("Gagal membuat thread");
+            return 1;
+        }
+        pthread_join(read_thread, NULL); // menunggu thread selesai
+    }
+    else {
+        fprintf(stderr, "Invalid command\n");
+        return 1;
+    }
+
+    return 0;
+}
+```
+- `pthread_t read_thread, write_thread` untuk menampung identitas thread yang akan dibuat. Digunakan untuk  menulis dan membaca pesan
+- `if (argc < 2)` untuk memeriksa apakah jumlah argumen baris perintah yang diberikan kurang dari 2. Jika iya, program menampilkan pesan penggunaan yang benar dan keluar dengan kode kesalahan 1
+- `if (strcmp(argv[1], "write") == 0)` untuk memeriksa apakah argumen pertama adalah "write". Jika iya, program akan menulis pesan ke dalam array `message` yang akan dituliskan ke dalam file
+- `pthread_create(&write_thread, NULL, write_msg, (void *)argv[argc - 1])` untuk membuat thread yang menulis pesan ke dalam file. Argumen keempat merupakan nama file target tempat pesan akan ditulis
+- `pthread_join(write_thread, NULL)` digunakan untuk menunggu thread selesai sebelum melanjutkan eksekusi
+- `else if (strcmp(argv[1], "read") == 0)` untuk memeriksa apakah argumen pertama adalah "read". Jika ya, program akan membuat thread untuk membaca pesan dari file yang ditentukan
+- `pthread_create(&read_thread, NULL, read_msg, (void *)argv[2])` untuk membuat thread untuk membaca pesan dari file
+- `pthread_join(read_thread, NULL)`  digunakan untuk menunggu thread selesai sebelum melanjutkan eksekusi
+
+*4. Dokumentasi*
+- Menulis pesan
+![alt text](/resource/3a-1.png)
+- Membaca pesan
+![alt text](/resource/3a-2.png)
+- File .txt yang terbentuk
+![alt text](/resource/3a-3.png)
 
 ### Problem 3b
 Buatlah Docker Image yang didalamnya berisi `chat.c` yang telah dibuat sebelumnya dan juga sudah tercompile dengan gcc (alias compile program c nya harus pada Dockerfile) dan beri nama `dockermessage`.
 
 **Jawab**
 
-[Jawab Disini]
+*1. Dockerfile*
+```Dockerfile
+# Base Image
+FROM gcc:latest
+
+# Set working directory
+WORKDIR /APP
+
+# Copy chat.c to working directory
+COPY chat.c .
+
+# Set execute permission
+RUN chmod +x chat.c
+
+# Compile chat.c
+RUN gcc -o chat chat.c -pthread
+```
+- `FROM gcc:latest` merupakan base image yang digunakan untuk membangun container docker. Dalam hal ini, base image yang digunakan adalah `gcc:latest` yang berarti menggunakan image GCC terbaru sebagai dasar
+- `WORKDIR /APP` merupakan tempat di mana file dan perintah berikutnya akan dieksekusi. Dalam hal ini, tempat untuk menetapkan direktori kerja adalah `/APP`
+- `COPY chat.c .` yaitu untuk mengcopy file `chat.c` dari local ke dalam direktori kerja di dalam image Docker
+- `RUN chmod +x chat.c` untuk memberikan izin eksekusi kepada file `chat.c` karena nantinya akan dilakukan kompilasi dan eksekusi file tersebut
+- `RUN gcc -o chat chat.c -pthread` untuk melakukan kompilasi file `chat.c` menggunakan compiler `GCC` di dalam image Docker
+- `-pthread` digunakan untuk mengaktifkan dukungan untuk pemrograman bersama (threading) dengan Pthreads pada saat kompilasi
+
+*2. Dokumentasi*
+- Build image `dockermessage`
+![alt text](/resource/3b-1.png)
+- Cek image
+![alt text](/resource/3b-2.png)
+- Jalankan container (read & write)
+![alt text](/resource/3b-3.png)
 
 ### Problem 3c
 Lalu buatlah `pengaturan.c` yang dapat membuat container baru yang unik dan menghapus container tersebut dari host, dengan docker image yang telah kalian buat sebelumnya menggunakan Dockerfile. contoh:
@@ -586,7 +728,285 @@ untuk login atau masuk ke dalam container `./pengaturan login dhafin`
 
 **Jawab**
 
-[Jawab Disini]
+*1. pengaturan.c*
+```C
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <stdbool.h>
+
+#define MAX_LENGTH 100
+#define MAX_CONTAINERS 100
+```
+Headers: Include standar input/output, standard library, string manipulation, dan system calls
+Defines: MAX_LENGTH dan MAX_CONTAINERS adalah konstanta yang mendefinisikan panjang maksimum nama kontainer dan jumlah maksimum kontainer.
+
+*2. Membuat fungsi createContainer*
+```C
+void createContainer(const char *containerName) {
+    char command[256];
+    snprintf(command, sizeof(command), "docker run -d --name %s dockermessage:v2", containerName);
+    int status = system(command);
+    if (status == -1) {
+        perror("Error creating container");
+    }
+}
+```
+fungsi createContainer: Mengambil nama kontainer dan membuat perintah untuk membuat kontainer Docker baru dengan nama tersebut menggunakan citra dockermessage:v2. Jika perintah gagal, maka akan mencetak pesan kesalahan.
+
+*3. Membuat fungsi deleteContainer*
+```C
+void deleteContainer(const char *containerName) {
+    char command[256];
+    snprintf(command, sizeof(command), "docker rm -f %s", containerName);
+    int status = system(command);
+    if (status == -1) {
+        perror("container doesn't exist\n");
+    }
+}
+```
+fungsi deleteContainer: Membuat perintah untuk menghapus secara paksa wadah tertentu. Jika perintah gagal, pesan kesalahan akan ditampilkan.
+
+*4. Membuat fungsi listContainers*
+```C
+void listContainers() { 
+    system("docker ps -a");
+}
+```
+fungsi listContainers: Mencantumkan semua kontainer Docker (baik yang berjalan maupun yang dihentikan).
+
+*5. Membuat fungsi connectContainers*
+```C
+void connectContainers(const char *container1, const char *container2, const char *sender1, const char *sender2) {
+    deleteContainer(container1);
+    deleteContainer(container2);
+
+    char receiver1[MAX_LENGTH];
+    char receiver2[MAX_LENGTH];
+
+    strcpy(receiver1, container1);
+    strcpy(receiver2, container2); 
+
+    char command[512];
+    snprintf(command, sizeof(command), "docker run -dit --name=%s --env SENDER=%s --env RECEIVER=%s -v sharedvolume:/APP dockermessage:v2", container1, sender2, receiver2);
+    int status = system(command);
+    if (status == -1) {
+        perror("Error creating container 1");
+    }
+
+    snprintf(command, sizeof(command), "docker run -dit --name=%s --env SENDER=%s --env RECEIVER=%s -v sharedvolume:/APP dockermessage:v2", container2, sender1, receiver1);
+    status = system(command);
+    if (status == -1) {
+        perror("Error creating container 2");
+    }
+}
+```
+fungsi connectContainers: Menghubungkan dua kontainer dengan menghapusnya terlebih dahulu dan kemudian membuatnya kembali dengan set variabel lingkungan tertentu. Hal ini memungkinkan pengaturan saluran komunikasi di antara keduanya.
+
+*6. Membuat fungsi unconnectContainers*
+```C
+void unconnectContainers(const char *container1, const char *container2) {
+    int status;
+
+    // Stop container 1
+    char command[512];
+    snprintf(command, sizeof(command), "docker rm %s", container1);
+    status = system(command);
+    if (status == -1) {
+        perror("Error stopping container 1");
+    } else if (status != 0) {
+        fprintf(stderr, "Failed to stop container 1: %s\n", container1);
+    }
+
+    // Stop container 2
+    snprintf(command, sizeof(command), "docker rm %s", container2);
+    status = system(command);
+    if (status == -1) {
+        perror("Error stopping container 2");
+    } else if (status != 0) {
+        fprintf(stderr, "Failed to stop container 2: %s\n", container2);
+    }
+
+    // Remove shared volume
+    snprintf(command, sizeof(command), "docker volume rm $(docker volume ls -qf 'name=sharedvolume')");
+    status = system(command);
+    if (status == -1) {
+        perror("Error removing shared volume");
+    } else if (status != 0) {
+        fprintf(stderr, "Failed to remove shared volume\n");
+    }
+}
+```
+fungsi unconnectContainers: Menghapus wadah yang ditentukan dan volume bersama.
+
+*7. Membuat fungsi loginContainer*
+```C
+void loginContainer(const char *containerName) {
+    char command[512];
+    snprintf(command, sizeof(command), "docker exec -it %s /bin/bash", containerName);
+    int loginStatus = system(command);
+    if (loginStatus == -1) {
+        perror("Error logging into container");
+    }
+}
+```
+fungsi loginContainer: Masuk ke dalam kontainer tertentu menggunakan Bash. Ini berguna untuk men-debug atau mengelola kontainer secara langsung.
+
+*8. Main Function*
+```C
+int main(int argc, char *argv[]) {
+```
+Definisi Fungsi: fungsi utama dengan argc (argument count) dan argv (argument vector) sebagai parameter. Ini adalah titik masuk dari setiap program C.
+
+```C
+    if (argc < 2) {
+        printf("Usage: %s <create/delete/list/login/connect/unconnect> [container_name1] [container_name2]\n", argv[0]);
+        return 1;
+    }
+```
+Pemeriksaan Jumlah Argumen: Memeriksa apakah jumlah argumen baris perintah kurang dari 2. Jika benar, maka akan mencetak format penggunaan program dan keluar dengan kode kembali 1 (menunjukkan kesalahan).
+
+```C
+    char sender[MAX_LENGTH];
+    char twopersononchat[MAX_CONTAINERS][MAX_LENGTH];
+    char thetwoperseon[MAX_CONTAINERS][MAX_LENGTH];
+    int container_count = 0;
+```
+Deklarasi Variabel:
+pengirim: Penyangga untuk menyimpan nama wadah.
+twopersononchat: array untuk menyimpan nama semua kontainer yang diambil dari Docker.
+thetwoperseon: Sebuah array untuk menyimpan sementara nama kontainer yang terlibat dalam operasi seperti menghubungkan atau memutuskan sambungan.
+container_count: Sebuah bilangan bulat untuk melacak jumlah kontainer yang terdaftar.
+
+```C
+    FILE *docker_inspect = popen("docker inspect --format='{{.Name}}' $(sudo docker ps -aq --no-trunc)", "r");
+    if (docker_inspect == NULL) {
+        printf("Error running docker inspect.\n");
+        return 1;
+    }
+```
+Eksekusi Perintah Inspect Docker: Menjalankan perintah yang menginspeksi semua kontainer dan mengambil namanya menggunakan Docker. Jika perintah gagal, sebuah pesan kesalahan akan dicetak dan program keluar dengan kode balik 1.
+
+```C
+    while (fgets(sender, MAX_LENGTH, docker_inspect) != NULL && container_count < MAX_CONTAINERS) {
+        sender[strcspn(sender, "\n")] = 0; // remove trailing newline
+        if (sender[0] == '/') {
+            memmove(sender, sender + 1, strlen(sender));
+        }
+        strcpy(twopersononchat[container_count], sender);
+        container_count++;
+    }
+```
+Membaca nama kontainer:
+Mengambil setiap baris dari keluaran perintah pemeriksaan Docker.
+Menghapus karakter baris baru dari akhir setiap nama kontainer.
+Jika nama dimulai dengan '/', maka karakter ini akan dihapus (nama Docker diawali dengan '/').
+Menyimpan nama yang telah dibersihkan dalam larik twopersononchat dan menambah jumlah kontainer.
+```C
+    pclose(docker_inspect);
+```
+CloseFile: Menutup file yang dibuka oleh popen.
+
+```C
+    if (strcmp(argv[1], "create") == 0) {
+        if (argc != 3) {
+            printf("Usage: %s create <container_name>\n", argv[0]);
+            return 1;
+        }
+        createContainer(argv[2]);
+    } 
+```
+Perintah Buat Kontainer: Jika argumen baris perintah pertama adalah "create", maka akan memeriksa jumlah argumen yang benar. Jika benar, maka akan memanggil fungsi createContainer dengan nama kontainer yang ditentukan.
+
+```C
+    else if (strcmp(argv[1], "delete") == 0) {
+        if (argc != 3) {
+            printf("Usage: %s delete <container_name>\n", argv[0]);
+            return 1;
+        }
+        deleteContainer(argv[2]);
+    } 
+```
+Perintah Hapus Kontainer: Struktur yang mirip dengan create. Fungsi ini memanggil fungsi deleteContainer jika perintah "hapus" ditentukan.
+```C
+    else if (strcmp(argv[1], "list") == 0) {
+        listContainers();
+    }
+```
+Perintah Daftar Kontainer: Memanggil fungsi listContainers untuk membuat daftar semua kontainer jika perintah "list" ditentukan.
+
+```C
+    else if (strcmp(argv[1], "login") == 0) {
+        if (argc != 3) {
+            printf("Usage: %s login <container_name>\n", argv[0]);
+            return 1;
+        }
+        loginContainer(argv[2]);
+    }
+```
+Perintah Login: Menangani perintah "login", memastikan argumen yang benar diteruskan dan kemudian memanggil loginContainer.
+
+```C
+    else if (strcmp(argv[1], "connect") == 0) {
+        if (argc != 4) {
+            printf("Usage: %s connect <container_name1> <container_name2>\n", argv[0]);
+            return 1;
+        }
+        // Code to handle the connect operation...
+    }
+    else if (strcmp(argv[1], "unconnect") == 0) {
+        if (argc != 4) {
+            printf("Usage: %s unconnect <container_name1> <container_name2>\n", argv[0]);
+            return 1;
+        }
+        // Code to handle the unconnect operation...
+    }
+    else {
+        printf("Invalid command\n");
+        return 1;
+    }
+```
+Perintah Connect dan Unconnect: Bagian ini menangani perintah sambung dan putuskan sambungan, memastikan jumlah argumen yang benar dan menangani sambungan kontainer seperti yang ditentukan.
+
+*9. Update Dockerfile. Dockerfile yang digunakan hampir sama dengan yang digunakan untuk membangun image `dockermessage`. Namun, untuk case kali ini (`dockermessage:v2`) ada penambahannya, yaitu sebagai berikut:*
+```Dockerfile
+# Base Image
+FROM gcc:latest
+
+# Set working directory
+WORKDIR /APP
+
+# Copy chat.c to working directory
+COPY chat.c .
+
+# Set execute permission
+RUN chmod +x chat.c
+
+# Compile chat.c
+RUN gcc -o chat chat.c -pthread
+
+# Create a Volume shared (POIN C DAN D)
+VOLUME /shared
+
+# Set entrypoint to run an interactive shell (POIN C DAN D)
+ENTRYPOINT ["/bin/sh"]
+```
+- `VOLUME /shared` digunakan untuk membuat volume bernama `shared`. Volume Docker adalah cara untuk menyimpan dan membagikan data antara container dan host, atau antara container yang berbeda. Di sini, `/shared` adalah direktori di dalam container yang akan dijadikan tempat untuk berbagi data
+- `ENTRYPOINT ["/bin/sh"]` digunakan ketika container dijalankan, ini akan memulai shell interaktif di dalam container. Ini memungkinkan pengguna untuk berinteraksi langsung dengan container setelah dijalankan
+
+*10. Dokumentasi*
+- Build image dockermessage:v2 (berhubungan dengan poin 3d, sehigga harus di build terlebih dahulu)
+![alt text](/resource/3c-1.png)
+- Cek image
+![alt text](/resource/3c-2.png)
+- Create container
+![alt text](/resource/3c-3.png)
+- List container
+![alt text](/resource/3c-4.png)
+- Delete container (dokumentasi pada poin 3d)
+- Login container (bisa dilakukan ketika 2 container sudah connect. Dokumentasi ikut pada poin 3d)
 
 ### Problem 3d
 Modifikasi `chat.c` dan build ulang menjadi docker image `dockermessage:v2` agar dapat mengirim chat ke container lain dan tambahkan argument pada pengaturan.c agar dapat connect dan uncoonnect sebuah container. (agar container dapat chat dengan container tujuan, container yang ingin chat harus connect terlebih dahulu ke container tujuan. Dan ketika sebuah container terbuat, secara otomatis dia juga memiliki kotak pesan yang nantinya dapat dia read dan dikirimi pesan oleh container lain). contoh:
@@ -603,11 +1023,163 @@ untuk melihat isi kotak pesan di container saat ini: `./chat read`
 
 **Jawab**
 
-[Jawab Disini]
+Pada soal ini, terdapat perubahan pada program `chat.c`. Berikut ini adalah langkah-langkahnya:
+
+*1. Membuat struct untut menyimpan data yang dibutuhkan oleh setiap thread dalam program*
+```C
+typedef struct {
+    char *word;  // Kata untuk ditulis
+    FILE *fp;    // File pointer untuk file output
+    int position; // Posisi kata dalam argumen
+} ThreadData;
+```
+- `char *word` merupakan pointer ke karakter yang merepresentasikan kata yang akan ditulis oleh thread dan dapat diakses secara dinamis di dalam memori
+- `FILE *fp` merupakan pointer ke `FILE` yang merepresentasikan file output di mana kata akan ditulis
+- `int position` untuk menunjukkan posisi kata dalam argumen
+
+*2. Membuat fungsi yang dijalankan oleh setiap thread untuk menulis kata*
+```C
+void *write_word(void *arg) {
+    ThreadData *data = (ThreadData *)arg;
+    fprintf(data->fp, "%s ", data->word);  // tulis kata ke file
+    return NULL;
+}
+```
+- Fungsi ini mengambil argumen bertipe `void *` dan mengembalikan `void *`. Ini adalah tipe fungsi yang digunakan oleh pthread
+- `ThreadData *data = (ThreadData *)arg` memiliki argumen `void *arg` yang di-casting menjadi tipe `ThreadData *` karena argumen yang dilewatkan adalah pointer ke struct `ThreadData`
+- `fprintf(data->fp, "%s ", data->word)` digunakan untuk menulis kata  yang disimpan di dalam struct `ThreadData` ke file yang ditunjukkan oleh `data->fp`
+- `return NULL` untuk mengembalikan `NULL` karena tidak ada nilai yang ingin dikembalikan dari thread ini
+
+*3. Membuat fungsi untuk menulis kata dalam file dengan multiple threads*
+```C
+void write_message(char **words, int count, char *filename) {
+    pthread_t threads[count];
+    ThreadData thread_data[count];
+    FILE *fp = fopen(filename, "w");
+
+    if (fp == NULL) {
+        perror("Error opening file");
+        return;
+    }
+
+    for (int i = 0; i < count; i++) {
+        thread_data[i].word = words[i];
+        thread_data[i].fp = fp;
+        thread_data[i].position = i;
+        pthread_create(&threads[i], NULL, write_word, &thread_data[i]);
+        sleep(1);  // tunggu 1 detik sebelum membuat thread baru
+    }
+
+    // tunggu semua thread selesai
+    for (int i = 0; i < count; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    fclose(fp);
+}
+```
+- `pthread_t threads[count]` mendeklarasikan array `threads` yang akan digunakan untuk menyimpan identitas thread yang dibuat dengan ukuran sesuai dengan jumlah kata yang ditulis
+- `ThreadData thread_data[count]` mendeklarasikan array `thread_data` yang akan menyimpan data yang diperlukan untuk setiap thread
+- Loop `for` pertama digunakan untuk menginisialisasi data untuk setiap thread dan membuat thread. Setiap elemen `thread_data` diisi dengan kata yang sesuai, file pointer yang sama `fp`, dan posisi kata dalam argumen. Setiap kata akan dibuat dengan thread baru menggunakan `pthread_create`
+- `sleep(1)` menunjukkan bahwa setelah membuat thread baru , program akan menunggu selama 1 detik
+- `pthread_join` berarti program menunggu setiap thread di dalam array `threads` selesai dieksekusi sebelum melanjutkan ke langkah berikutnya
+
+*4. Membuat fungsi untuk membaca kata dalam file*
+```C
+void read_message(char *filename) {
+    char buffer[1024];
+    FILE *fp = fopen(filename, "r");
+    
+    if (fp == NULL) {
+        perror("Error opening file");
+        return;
+    }
+
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        printf("%s", buffer);
+    }
+    fclose(fp);
+}
+```
+- `char buffer[1024]` mendeklarasikan array `buffer` dengan ukuran 1024 yang digunakan untuk menyimpan setiap baris pesan yang dibaca dari file
+- `fgets(buffer, sizeof(buffer), fp) != NULL` digunakan untuk membaca satu baris dari file ke dalam buffer dengan tiga parameter, yaitu buffer tempat data akan disimpan, ukuran buffer, dan file pointer
+
+*5. Setelah semua fungsi selesai dibuat, maka beralih ke Main Function*
+```C
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <write/read> [<message>] [<target_container>]\n", argv[0]);
+        return 1;
+    }
+    FILE *fp;
+
+    if (strcmp(argv[1], "write") == 0) {
+       if (argc < 4) {
+            fprintf(stderr, "Usage: %s write <message> <target_container>\n", argv[0]);
+            return 1;
+        }
+        char *words[argc - 3];
+        int word_count = argc - 3;
+        for (int i = 0; i < word_count; i++) {
+            words[i] = argv[i + 2];
+        }
+
+        // Membuat nama file dari nama kontainer tujuan
+        char filename[100];
+        snprintf(filename, sizeof(filename), "%s", argv[argc - 1]);
+
+        write_message(words, word_count, filename);
+
+        fp = fopen(filename, "a");
+        if (fp == NULL) {
+            perror("Error opening file");
+            return 1;
+        }
+        
+        fprintf(fp, "from %s\n", getenv("SENDER")); 
+
+        printf("Pesan berhasil ditulis ke %s\n", argv[argc - 1]);
+        printf("nama file : %s\n", filename);
+    } else if (strcmp(argv[1], "read") == 0) {
+        char filename[100];
+        snprintf(filename, sizeof(filename), "%s", getenv("SENDER"));
+        read_message(filename);
+    } else {
+        fprintf(stderr, "Invalid command\n");
+        return 1;
+    }
+
+    return 0;
+}
+```
+- Program ini memeriksa jumlah argumen yang diterima. Jika jumlah argumen kurang dari 2, program akan mengeksekusi `if (argc < 2)`
+- `FILE *fp` digunakan untuk mengakses file
+- `if (strcmp(argv[1], "write") == 0)` digunakan untuk mengecek apakah argumen pertama adalah "write". Jika iya,  program memeriksa apakah jumlah argumen cukup untuk menulis pesan ke file
+- `char *words[argc - 3]` merupakan deklarasi untuk membuat array dari pointer-pointer ke string, dengan ukuran array ditentukan oleh ekspresi `argc - 3`
+- `int word_count = argc - 3` merupakan deklarasi variabel `word_count` untuk menghitung jumlah kata yang akan ditulis ke dalam file
+- Loop `for` digunakan untuk mengisi array `words` dengan kata-kata yang akan ditulis ke dalam file
+- `char filename[100]` merupakan deklarasi array `filename` dengan ukuran 100 digunakan untuk menyimpan nama file yang akan ditulis/dibaca
+- `snprintf(filename, sizeof(filename), "%s", argv[argc - 1])` digunakan untuk membuat nama file yang akan ditulis atau dibaca oleh program
+- `write_message(words, word_count, filename)` merupakan pemanggilan fungsi `write_message` untuk menulis pesan menggunakan kata-kata yang telah disiapkan ke dalam file yang telah diformatkan sebagai `filename`
+- `fprintf(fp, "from %s\n", getenv("SENDER"))` digunakan untuk mencetak pesan ke file yang telah dibuka sebelumnya `fp`
+- `getenv("SENDER")` digunakan untuk mendapatkan nilai dari variabel lingkungan dengan nama "SENDER"
+- `else if (strcmp(argv[1], "read") == 0)` digunakan untuk mengecek apakah argumen pertama adalah "read". Jika iya,  program akan membaca nama file dari variabel lingkungan `SENDER` dan kemudian memanggil fungsi `read_message` untuk membaca dan mencetak isi file tersebut
+
+*6. Dokumentasi*
+- Connect container
+![alt text](/resource/3d-1.png)
+- Login container 1 dan mengirim pesan
+![alt text](/resource/3d-2.png)
+- Login container 2 dan membaca pesan
+![alt text](/resource/3d-3.png)
+- Unconnect container
+![alt text](/resource/3d-4.png)
+- Delete container
+![alt text](/resource/3d-15.png)
 
 ### Kendala
 
-[Tulis Disini]
+Untuk kendala mungkin saat praktikum hanya mampu mengerjakan sampai soal poin b saja. Ketika revisi, Alhamdulillahnya bisa menyelesaikan sampai poin d. Saat demo juga ada revisi mengenai bagian unconnect container, dimana yang seharusnya container di stop malah di remove. Jadi, untuk saat ini kendala sudah teratasi dan semua program dapat dijalankan sesuai dengan apa yang diminta soal. 
 
 ## 4️⃣ Soal 4
 ### Problem 4a
