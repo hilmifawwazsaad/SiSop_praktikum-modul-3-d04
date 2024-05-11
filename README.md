@@ -1175,7 +1175,7 @@ int main(int argc, char *argv[]) {
 - Unconnect container
 ![alt text](/resource/3d-4.png)
 - Delete container
-![alt text](/resource/3d-15.png)
+![alt text](/resource/3d-5.png)
 
 ### Kendala
 
