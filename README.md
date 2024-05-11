@@ -4,7 +4,7 @@
 |    NRP     |      Name      |
 | :--------: | :------------: |
 | 5025221007 | Yehezkiella Felicia Jeis Timbulong |
-| 5025221000 | Student 2 Name |
+| 5025221047 | Muhammad Rayyaan Fatikhahur Rakhim |
 | 5025221103 | Hilmi Fawwaz Sa'ad |
 
 # Praktikum Modul 3 _(Module 3 Lab Work)_
@@ -1181,7 +1181,187 @@ int main(int argc, char *argv[]) {
 
 Untuk kendala mungkin saat praktikum hanya mampu mengerjakan sampai soal poin b saja. Ketika revisi, Alhamdulillahnya bisa menyelesaikan sampai poin d. Saat demo juga ada revisi mengenai bagian unconnect container, dimana yang seharusnya container di stop malah di remove. Jadi, untuk saat ini kendala sudah teratasi dan semua program dapat dijalankan sesuai dengan apa yang diminta soal. 
 
+
 ## 4️⃣ Soal 4
+#### docker file
+
+```
+# Gunakan PHP 8.1 FPM sebagai image dasar
+FROM php:8.1-fpm
+```
+Baris ini mendefinisikan image dasar yang akan digunakan oleh semua instruksi berikutnya dalam Dockerfile. Di sini, menggunakan PHP versi 8.1 dengan FastCGI Process Manager (FPM).
+
+```
+# Pasang dependensi sistem
+RUN apt-get update && apt-get install -y \
+    libpng-dev \    # untuk mengolah gambar PNG
+    libonig-dev \   # untuk ekspresi reguler multibyte
+    libxml2-dev \   # untuk mengolah XML
+    zip \           # untuk manipulasi file zip
+    unzip \         # untuk membuka file zip
+    curl            # untuk mentransfer data dengan URL
+
+```
+Baris ini menjalankan update pada repositori paket dan menginstal beberapa dependensi sistem yang diperlukan untuk aplikasi, seperti pustaka untuk mengolah gambar PNG, ekspresi reguler, dan XML, serta program untuk mengolah file ZIP dan transfer data.
+
+```
+# Pasang ekstensi PHP
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+```
+Baris ini menginstal ekstensi PHP yang dibutuhkan oleh aplikasi, seperti pdo_mysql untuk database MySQL, mbstring untuk pengolahan string multibyte, exif untuk informasi metadata dalam gambar, pcntl untuk kontrol proses, bcmath untuk operasi matematika presisi tinggi, dan gd untuk operasi grafik.
+
+```
+# Atur direktori kerja
+WORKDIR /var/www/html
+```
+Mengatur direktori kerja pada /var/www/html. Semua instruksi berikutnya yang menggunakan jalur relatif akan beroperasi dalam direktori ini.
+```
+# Pasang Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+```
+Mengunduh dan menginstal Composer, alat manajemen dependensi untuk PHP, ke dalam image.
+```
+# Pastikan Composer berjalan sebagai non-root untuk alasan keamanan (setel variabel lingkungan untuk menghindari peringatan)
+ENV COMPOSER_ALLOW_SUPERUSER=0
+```
+Menetapkan variabel lingkungan untuk memastikan Composer tidak berjalan sebagai superuser untuk meningkatkan keamanan.
+```
+# Tambahkan pengguna untuk aplikasi
+RUN groupadd -g 1000 www && \
+    useradd -u 1000 -ms /bin/bash -g www www
+```
+Membuat grup baru www dan pengguna www dengan shell bash, ditujukan untuk menjalankan proses aplikasi sebagai pengguna non-root.
+```
+# Salin kode aplikasi ke dalam image
+COPY . /var/www/html
+```
+Menyalin semua file dari direktori saat ini (di mana Dockerfile berada) ke dalam direktori /var/www/html pada image.
+```
+# Ubah kepemilikan file yang disalin ke pengguna 'www' baru
+RUN chown -R www:www /var/www/html
+```
+Mengubah kepemilikan semua file di direktori /var/www/html menjadi pengguna www, untuk keamanan dan pemisahan peran.
+```
+# Jalankan Composer sebagai pengguna 'www'
+USER www
+```
+Mengubah pengguna yang aktif menjadi www untuk menjalankan perintah berikutnya sebagai pengguna ini.
+```
+# Pasang dependensi proyek
+RUN composer install
+```
+Menjalankan Composer untuk menginstal semua dependensi yang didefinisikan dalam file composer.json dari aplikasi.
+```
+# Kembali ke pengguna root untuk menjalankan aplikasi
+USER root
+```
+Mengembalikan pengguna aktif menjadi root.
+```
+# Buka port 8000
+EXPOSE 8000
+```
+Menentukan bahwa container akan mendengarkan pada port 8000.
+```
+# Atur ENTRYPOINT menggunakan server bawaan PHP
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+```
+Menentukan perintah yang akan dijalankan saat container dijalankan
+
+#### Docker-compose.yml
+```
+version: '3.8'
+```
+Menentukan versi dari Docker Compose file format yang digunakan. Versi '3.8' mendukung fitur terkini untuk Docker Compose.
+```
+services:
+```
+Menentukan bahwa berikutnya adalah konfigurasi untuk layanan (services) yang termasuk dalam aplikasi.
+```
+  shaniz696969:
+```
+Mendefinisikan sebuah layanan dengan nama shaniz696969.
+```
+    build:
+```
+Menunjukkan bahwa layanan ini akan dibangun dari Dockerfile.
+```
+      context: .  # Pastikan konteks diatur jika Dockerfile berada di direktori yang sama dengan docker-compose.yml
+```
+Menetapkan konteks build ke direktori saat ini, yang berarti Dockerfile berada di direktori yang sama dengan file docker-compose.yml
+```
+      dockerfile: Dockerfile
+```
+Menunjukkan nama file Dockerfile yang akan digunakan untuk build.
+```
+    ports:
+      - "9090:8000"  # Diubah untuk mencocokkan port internal yang digunakan oleh Laravel
+```
+Memetakan port 9090 pada host ke port 8000 pada container. Ini memungkinkan akses ke aplikasi dari luar container melalui port 9090.
+```
+    environment:
+        APP_ENV: local
+      APP_DEBUG: true
+      APP_URL: http://localhost:9090
+      DB_CONNECTION: mysql
+      DB_HOST: db-shaniz
+      DB_PORT: 3306
+      DB_DATABASE: keyisa
+      DB_USERNAME: root
+      DB_PASSWORD: my-secret-pw
+```
+Konfigurasi lingkungan aplikasi, seperti setting untuk debugging, URL aplikasi, dan konfigurasi koneksi database.
+```
+ depends_on:
+      - db-shaniz
+```
+Menentukan bahwa layanan shaniz696969 bergantung pada layanan db-shaniz. Ini memastikan bahwa db-shaniz dijalankan sebelum shaniz696969.
+```
+    networks:
+      - shani-net
+```
+Menghubungkan layanan ini ke jaringan shani-net, yang diatur di bagian bawah file.
+```
+  db-shaniz:
+```
+Mendefinisikan layanan kedua dengan nama db-shaniz.
+```
+    image: mysql:5.7
+```
+Menggunakan image mysql:5.7 dari Docker Hub untuk layanan ini.
+```
+    environment:
+```
+Menentukan variabel lingkungan untuk container MySQL.
+```
+      MYSQL_DATABASE: keyisa
+      MYSQL_ROOT_PASSWORD: my-secret-pw
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+```
+Menetapkan nama database, password root, dan kebijakan password.
+```
+    ports:
+      - "3306:3306"
+```
+Memetakan port 3306 dari host ke port 3306 pada container, memungkinkan akses ke MySQL dari luar container.
+```
+    networks:
+      - shani-net
+```
+Menghubungkan layanan ini ke jaringan shani-net.
+```
+networks:
+```
+Mendefinisikan jaringan yang digunakan oleh services.
+```
+  shani-net:
+```
+Mendefinisikan jaringan dengan nama shani-net.
+```
+    driver: bridge
+```
+Menggunakan driver jembatan untuk jaringan, yang memungkinkan container yang terhubung ke jaringan yang sama untuk berkomunikasi satu sama lain.
+
+
 ### Problem 4a
 Akses URL berikut untuk mendapatkan resource yang dibutuhkan, yaitu sebuah aplikasi yang sedang dibuat oleh Shaniz696969!
 
@@ -1191,14 +1371,14 @@ It’s kinda legit, right? Aneh juga ya dia tidak pakai GitHub atau semacamnya t
 
 **Jawab**
 
-[Jawab Disini]
+![alt text](resource/4a-1.png)
 
 ### Problem 4b
 Selanjutnya, karena Shaniz696969 mengatakan bahwa aplikasi ini menggunakan relational database berupa MySQL, mau tidak mau kamu harus membuat container yang menjalankan image dari MySQL! Pastikan container berjalan sebagai daemon.
 
 **Jawab**
 
-[Jawab Disini]
+![alt text](resource/4b-1.png)
 
 ### Problem 4c
 Kamu ingat bahwa sudah membuat image dari aplikasi Shaniz696969? Nah, sekarang, jalankan image tersebut sebagai container. Pastikan container berjalan sebagai daemon.
@@ -1206,20 +1386,22 @@ Kamu ingat bahwa sudah membuat image dari aplikasi Shaniz696969? Nah, sekarang, 
 **Jawab**
 
 [Jawab Disini]
+![alt text](resource/4c-1.png)
 
 ### Problem 4d
 Apa lagi yang kurang? Yup, kamu harus melakukan koneksi antara aplikasi backend tersebut dengan database yang telah dijalankan. Tentunya, dalam container yang telah kita jalankan di poin-poin sebelumnya, kan? Nah, lakukan koneksi antara dua container tersebut dalam satu network bernama Shani-net!
 
 **Jawab**
 
-[Jawab Disini]
+![alt text](resource/4d-1.png)
+![alt text](resource/4d-2.png)
 
 ### Problem 4e
 Terakhir, kamu harus lakukan setup pada aplikasi backend tersebut dengan menggunakan dokumentasi Laravel sebagai panduan kalian! Aplikasi harus bisa diakses melalui http://localhost:9090. Agar lebih legit, kalian bisa melakukan hit pada endpoint /api/province.
 
-**Jawab**
-
-[Jawab Disini]
+![alt text](resource/4e-1.png)
+![alt text](resource/4e-2.png)
+![alt text](resource/4e-2.png)
 
 ### Kendala
 

@@ -1,104 +1,163 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/msg.h>
+#include <sys/wait.h>
 
-#define MAX_CLIENTS 5
-#define MAX_USERNAME_LENGTH 50
-#define MAX_CONTAINER_NAME_LENGTH 50
-#define MAX_IMAGE_LENGTH 100
-#define MAX_COMMAND_LENGTH 100
-#define MAX_VOLUME_LENGTH 100
+struct client
+{
+    char username[100];
+    int turn;
+    int length;
+    int total;
+};
 
-typedef struct {
-    char username[MAX_USERNAME_LENGTH];
-    char container_name[MAX_CONTAINER_NAME_LENGTH];
-    char image[MAX_IMAGE_LENGTH];
-    char command[MAX_COMMAND_LENGTH];
-    char volume[MAX_VOLUME_LENGTH];
-    int active;
-} ClientRequest;
+struct user
+{
+    char nama[100];
+    char nama_container[100];
+    char image[100];
+    char command[200];
+    char volume[200];
+};
 
-int main() {
-    key_t key = ftok("server", 65);
-    int shmid = shmget(key, MAX_CLIENTS * sizeof(ClientRequest), 0666|IPC_CREAT);
-    ClientRequest *client_requests = (ClientRequest*) shmat(shmid, (void*)0, 0);
+struct message
+{
+    long mess_type;
+    char nama_container[100];
+    char image[100];
+    char command[200];
+    char volume[200];
+    int turn;
+} mess;
 
-    printf("Server is running...\n");
-
-    int num_clients = 0;
-    while (num_clients < MAX_CLIENTS) {
-        printf("Waiting for clients to connect...\n");
-
-        while (num_clients == 0) {
-            for (int i = 0; i < MAX_CLIENTS; i++) {
-                if (client_requests[i].active == 1) {
-                    num_clients++;
-                }
-            }
-        }
-
-        printf("All clients connected.\n");
-
-        // Wait for all clients to send their requests
-        int all_requests_received = 0;
-        while (!all_requests_received) {
-            all_requests_received = 1;
-            for (int i = 0; i < MAX_CLIENTS; i++) {
-                if (client_requests[i].active == 1) {
-                    if (client_requests[i].container_name[0] == '\0') {
-                        all_requests_received = 0;
-                        break;
-                    }
-                }
-            }
-        }
-
-        printf("All requests received. Generating docker-compose file...\n");
-
-        // Generate docker-compose file
-        FILE *compose_file = fopen("docker-compose.yml", "w");
-        fprintf(compose_file, "version: '3'\nservices:\n");
-
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (client_requests[i].active == 1) {
-                fprintf(compose_file, "  %s:\n", client_requests[i].container_name);
-                fprintf(compose_file, "    image: %s\n", client_requests[i].image);
-                fprintf(compose_file, "    command: %s\n", client_requests[i].command);
-                fprintf(compose_file, "    volumes:\n");
-                fprintf(compose_file, "      - %s\n", client_requests[i].volume);
-            }
-        }
-
-        fclose(compose_file);
-
-        printf("Docker-compose file generated.\n");
-
-        // Run docker-compose
-        system("docker-compose up -d");
-
-        printf("All services are running.\n");
-
-        // Wait for all clients to send new requests
-        printf("Waiting for new requests...\n");
-        int all_requests_reset = 0;
-        while (!all_requests_reset) {
-            all_requests_reset = 1;
-            for (int i = 0; i < MAX_CLIENTS; i++) {
-                if (client_requests[i].active == 1) {
-                    memset(&client_requests[i], 0, sizeof(ClientRequest));
-                    all_requests_reset = 0;
-                }
-            }
-        }
-
-        printf("All requests reset.\n");
-        num_clients = 0;
+void createDockerCompose(int total, struct user *usr)
+{
+    FILE *file = fopen("docker-compose.yml", "w");
+    if (file == NULL)
+    {
+        fprintf(stderr, "Failed to open file.\n");
+        return;
     }
 
-    shmdt(client_requests);
-    shmctl(shmid, IPC_RMID, NULL);
-    return 0;
+    fprintf(file, "version: '3.8'\n");
+    fprintf(file, "services:\n");
+    for (int i = 0; i < total; i++)
+    {
+        fprintf(file, "  %s:\n", usr[i].nama_container);
+        fprintf(file, "    container_name: %s\n", usr[i].nama_container);
+        fprintf(file, "    image: %s\n", usr[i].image);
+        fprintf(file, "    command: %s\n", usr[i].command);
+        fprintf(file, "    volumes:\n");
+        fprintf(file, "      - %s\n", usr[i].volume);
+    }
+
+    fclose(file);
+    printf("docker-compose.yml has been created successfully.\n");
+}
+
+int main()
+{
+    key_t key_server = 1234, key_user = 5678;
+    int server_id = shmget(key_server, sizeof(struct client), IPC_CREAT | 0666);
+    int user_id = shmget(key_user, 5 * sizeof(struct user), IPC_CREAT | 0666);
+    struct client *cl = shmat(server_id, NULL, 0);
+    struct user *usr = shmat(user_id, NULL, 0);
+    cl->length = 0;
+    cl->turn = 0;
+    cl->total = 0;
+    cl->username[0] = '*';
+    printf("Total client yang akan dilayani (1-5): ");
+    scanf("%d", &cl->total);
+    while (cl->total != cl->length)
+    {
+    }
+    printf("\nSemua client sudah berkumpul\n");
+
+    key_t mess_key = 9101;
+    int mess_id = msgget(mess_key, 0666 | IPC_CREAT);
+    int ronde = 1;
+    while (1)
+    {
+        // MESSAGED QUEUE
+        msgrcv(mess_id, &mess, sizeof(mess), 1, 0);
+        printf("\nService dari client %s berhasil diterima\n", usr[mess.turn - 1].nama);
+
+        printf("Nama container: %s\n", mess.nama_container);
+        strcpy(usr[mess.turn - 1].nama_container, mess.nama_container);
+
+        printf("Image: %s\n", mess.image);
+        strcpy(usr[mess.turn - 1].image, mess.image);
+
+        printf("Command: %s\n", mess.command);
+        strcpy(usr[mess.turn - 1].command, mess.command);
+
+        printf("Volume: %s\n", mess.volume);
+        strcpy(usr[mess.turn - 1].volume, mess.volume);
+        // END MESSAGED QUEUE
+
+        if (mess.turn == cl->total)
+        {
+            pid_t child_pid;
+            child_pid = fork();
+            if (child_pid == -1)
+            {
+                perror("Failed to fork");
+                return 1;
+            }
+            if (child_pid == 0)
+            {
+                if (ronde > 1)
+                {
+                    pid_t child_pid_docker_compose;
+                    child_pid_docker_compose = fork();
+                    if (child_pid_docker_compose == 0)
+                    {
+                        pid_t child_pid_docker_rm;
+                        child_pid_docker_rm = fork();
+                        if (child_pid_docker_rm == 0)
+                        {
+                            if (execlp("sh", "sh", "-c", "docker rm $(docker container ps -aq)", NULL) == -1)
+                            {
+                                perror("Failed to execute command");
+                            }
+                        }
+                        else
+                        {
+                            wait(NULL);
+                            char *argv[] = {"rm", "docker-compose.yml", NULL};
+                            execv("/usr/bin/rm", argv);
+                        }
+                    }
+                    else
+                    {
+                        wait(NULL);
+                    }
+                }
+                createDockerCompose(cl->total, usr);
+                if (execlp("docker-compose", "docker-compose", "up", NULL) == -1)
+                {
+                    perror("Error executing Docker Compose");
+                    return 1;
+                }
+            }
+            else
+            {
+                ronde++;
+            }
+        }
+
+        for (int i = 1; i <= cl->total; i++)
+        {
+            mess.mess_type = i;
+            msgsnd(mess_id, &mess, sizeof(mess), 0);
+        }
+    }
+    shmdt(cl);
+    shmctl(server_id, IPC_RMID, NULL);
+    shmdt(usr);
+    shmctl(user_id, IPC_RMID, NULL);
 }
