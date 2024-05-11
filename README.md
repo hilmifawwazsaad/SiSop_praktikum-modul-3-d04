@@ -763,7 +763,7 @@ Setelah semua request service dari client terkumpul, server lalu menggabungkanny
 
 ### Kendala
 
-[Tulis Disini]
+NRP 5025221007 tidak mengerjakan lapres sama sekali. Seharusnya dia mengerjakan nomor ini, tetapi hanya rename saja....
 
 ## 3️⃣ Soal 3
 ### Problem 3a
@@ -1612,7 +1612,7 @@ Terakhir, kamu harus lakukan setup pada aplikasi backend tersebut dengan menggun
 
 ### Kendala
 
-[Tulis Disini]
+Sejauh ini, tidak ada kendala untuk no 4.
 
 <div align=center>
 
