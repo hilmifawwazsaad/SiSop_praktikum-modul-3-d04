@@ -522,6 +522,214 @@ services:
 Sejauh ini belum ada kendala dalam mengerjakan soal no 1.
 
 ## 2️⃣ Soal 2
+### Server.c
+```C
+struct client
+{
+    char username[100];
+    int turn;
+    int length;
+    int total;
+};
+
+struct user
+{
+    char nama[100];
+    char nama_container[100];
+    char image[100];
+    char command[200];
+    char volume[200];
+};
+
+struct message
+{
+    long mess_type;
+    char nama_container[100];
+    char image[100];
+    char command[200];
+    char volume[200];
+    int turn;
+} mess;
+
+```
+client: Struktur untuk menyimpan informasi tentang klien, termasuk nama pengguna, status turn, panjang, dan total klien.
+user: Struktur untuk menyimpan informasi tentang pengguna, termasuk nama, nama container, image, command, dan volume yang akan digunakan dalam Docker Compose.
+message: Struktur untuk menyimpan dan mengirim informasi melalui message queue, termasuk tipe pesan, informasi container, image, command, volume, dan turn.
+
+```C
+void createDockerCompose(int total, struct user *usr)
+{
+    FILE *file = fopen("docker-compose.yml", "w");
+    fprintf(file, "version: '3.8'\n");
+    fprintf(file, "services:\n");
+    for (int i = 0; i < total; i++)
+    {
+        fprintf(file, "  %s:\n", usr[i].nama_container);
+        fprintf(file, "    container_name: %s\n", usr[i].nama_container);
+        fprintf(file, "    image: %s\n", usr[i].image);
+        fprintf(file, "    command: %s\n", usr[i].command);
+        fprintf(file, "    volumes:\n");
+        fprintf(file, "      - %s\n", usr[i].volume);
+    }
+    fclose(file);
+    printf("docker-compose.yml has been created successfully.\n");
+}
+```
+Fungsi ini membuat file docker-compose.yml berdasarkan data dari array usr. File ini berisi konfigurasi untuk menjalankan container Docker sesuai dengan spesifikasi yang diberikan oleh pengguna.
+
+```C
+int main()
+{
+    key_t key_server = 1234, key_user = 5678;
+    int server_id = shmget(key_server, sizeof(struct client), IPC_CREAT | 0666);
+    int user_id = shmget(key_user, 5 * sizeof(struct user), IPC_CREAT | 0666);
+    struct client *cl = shmat(server_id, NULL, 0);
+    struct user *usr = shmat(user_id, NULL, 0);
+}
+```
+Membuat dan mengakses shared memory untuk menyimpan data klien dan pengguna. Ini digunakan untuk komunikasi antar proses yang berbeda dalam sistem yang sama.
+
+```C
+while (1)
+{
+    msgrcv(mess_id, &mess, sizeof(mess), 1, 0);
+    // ... proses pesan dan simpan ke struktur user ...
+    if (mess.turn == cl->total)
+    {
+        pid_t child_pid = fork();
+        if (child_pid == 0)
+        {
+            // ... proses lebih lanjut dan eksekusi docker-compose ...
+        }
+    }
+    // ... kirim pesan balasan ke semua klien ...
+}
+```
+Program ini secara terus-menerus menerima pesan dari klien, memprosesnya, dan melakukan aksi yang diperlukan. Jika sudah giliran terakhir, program akan melakukan forking dan menjalankan Docker Compose.
+
+```C
+shmdt(cl);
+shmctl(server_id, IPC_RMID, NULL);
+shmdt(usr);
+shmctl(user_id, IPC_RMID, NULL);
+```
+Di akhir, program melakukan pembersihan shared memory yang telah digunakan, menghindari kebocoran memori dan memastikan sistem tetap bersih.
+
+### Client.c
+```C
+struct client
+{
+    char username[100];
+    int turn;
+    int length;
+    int total;
+};
+
+struct user
+{
+    char nama[100];
+    char nama_container[100];
+    char image[100];
+    char command[200];
+    char volume[200];
+};
+
+struct message
+{
+    long mess_type;
+    char nama_container[100];
+    char image[100];
+    char command[200];
+    char volume[200];
+    int turn;
+} mess;
+```
+client: Struktur untuk menyimpan data client, seperti username, turn, jumlah client saat ini, dan total client yang diharapkan.
+user: Struktur untuk menyimpan detail user, termasuk nama, spesifikasi container, image, command, dan volume.
+message: Struktur untuk komunikasi antar client melalui message queue, menyimpan informasi container, image, command, volume, dan urutan client.
+
+```C
+int main()
+{
+    key_t key_server = 1234, key_user = 5678;
+    int server_id = shmget(key_server, sizeof(struct client), 0666);
+    int user_id = shmget(key_user, 5 * sizeof(struct user), 0666);
+    struct client *cl = shmat(server_id, NULL, 0);
+    struct user *usr = shmat(user_id, NULL, 0);
+}
+```
+Menginisiasi shared memory untuk menyimpan data client dan user. Ini memungkinkan aplikasi untuk membagikan informasi antar proses yang berbeda.
+
+```C
+if (cl->total == 0)
+{
+    printf("Sedang menunggu server...\n");
+}
+while (cl->total < 1 || cl->total > 5)
+{
+    // Loop tanpa aksi spesifik sampai jumlah client valid (antara 1 dan 5)
+}
+printf("Server akan melayani %d client\n", cl->total);
+```
+Menunggu sampai jumlah client diatur oleh server dan validasi bahwa jumlah tersebut berada di rentang yang diizinkan.
+
+```C
+if (cl->length == 0)
+{
+    printf("Masukan username anda:");
+    scanf("%s", cl->username);
+    strcpy(usr[0].nama, cl->username);
+    cl->length = 1;
+}
+else
+{
+    while (1)
+    {
+        printf("Masukan username anda:");
+        scanf("%s", cl->username);
+        // Validasi username untuk menghindari duplikasi
+    }
+}
+
+```
+Mengambil dan memvalidasi username dari user, memastikan bahwa tidak ada duplikasi username dalam sistem.
+
+```C
+key_t mess_key = 9101;
+int mess_id = msgget(mess_key, 0666 | IPC_CREAT);
+int turn = 1;
+while (1)
+{
+    if (turn == myTurn)
+    {
+        // Meminta user memasukkan detail Docker container
+        msgsnd(mess_id, &mess, sizeof(mess), 0);
+    }
+    else
+    {
+        printf("Menunggu client lain...\n");
+    }
+    msgrcv(mess_id, &mess, sizeof(mess), myTurn, 0);
+    if (turn == cl->total)
+    {
+        turn = 1;
+        continue;
+    }
+    turn++;
+}
+
+```
+Menggunakan message queue untuk memfasilitasi komunikasi antar client. Setiap client menunggu gilirannya untuk memasukkan detail container Docker yang kemudian dikirim melalui queue.
+
+```C
+shmdt(cl);
+shmctl(server_id, IPC_RMID, NULL);
+shmdt(usr);
+shmctl(user_id, IPC_RMID, NULL);
+```
+Membersihkan sumber daya yang digunakan, termasuk shared memory, untuk menghindari kebocoran memori.
+
+
 ### Problem 2a
 Buatlah 2 file, yaitu `server.c` dan `client.c`.
 
@@ -531,28 +739,27 @@ Disaat `client.c` pertama kali dijalankan, dia akan meminta prompt user untuk me
 
 **Jawab**
 
-[Jawab Disini]
+![alt text](resource/2a-1.png)
 
 ### Problem 2b
 Ketika semua client yang dibutuhkan oleh server telah terkumpul, setiap client akan mulai diberikan prompt untuk mengetikkan service yang dibutuhkan, yaitu `Nama Container`, `Image yang Digunakan`, `Perintah Saat Kontainer Dimulai`, dan `Volume`. Urutan client yang mengirimkan request service ke server ditentukan dari waktu mereka register. Contoh: Jika username ragnar registrasi pertama kali, lalu diikuti username towel, maka ragnar yang akan mengirim request terlebih dahulu, lalu diikuti towel, dst.
 
 **Jawab**
 
-[Jawab Disini]
-
+![alt text](resource/2b-1.png)
 ### Problem 2c
 Setelah semua request service dari client terkumpul, server lalu menggabungkannya menjadi sebuah file docker compose. Lalu jalankan file docker compose yang dibuat tadi.
 
 **Jawab**
 
-[Jawab Disini]
+![alt text](resource/2c-1.png)
 
 ### Problem 2d
  Tidak sampai situ, setelah docker compose sebelumnya selesai dijalankan, `client.c` akan meminta prompt lagi dari user. Prompt yang diberikan sesuai dengan point (b). Jika setiap client melakukan hal yang sama pada point (b), maka server akan menghasilkan file docker compose yang baru. Lalu container yang telah dijalankan sebelumnya akan dihancurkan, yang kemudian akan digantikan oleh service terbaru yang telah di request dari client tadi.
 
 **Jawab**
 
-[Jawab Disini]
+![alt text](resource/2d-1.png)
 
 ### Kendala
 
